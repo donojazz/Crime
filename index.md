@@ -7,11 +7,11 @@
 
 ### Crime Files
 
-- This is a clustered view of [homicide](https://donojazz.github.io/html_store/cluster_homicides.html)data.
+- This is a clustered view of [homicide](https://donojazz.github.io/html_store/cluster_homicides.html) data.
 
-- This is a view of [homicide](https://donojazz.github.io/html_store/homicide_map.html)mappings.                
+- This is a view of [homicide](https://donojazz.github.io/html_store/homicide_map.html) mappings.                
 
-- This is a view of [homicide](https://donojazz.github.io/html_store/homicides_police_box.html)mappings.
+- This is a view of [homicide](https://donojazz.github.io/html_store/homicides_police_box.html) mappings.
 
                     
 
