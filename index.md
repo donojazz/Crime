@@ -15,7 +15,7 @@
 
 ### Homicide Files
 
-- Complete homicide[analysis](https://donojazz.github.io/html_store/carjacks-jan2020.html)
+- Complete homicide [analysis](https://donojazz.github.io/html_store/carjacks-jan2020.html)
 
 - This is a clustered view of [homicide](https://donojazz.github.io/html_store/cluster_homicides.html) data.
 
