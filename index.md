@@ -10,7 +10,7 @@
 
 - This is a view of [carjacks](https://donojazz.github.io/Crime/carjack_map.html) that occurred within STL  Neighborhoods.                
 
-- This is a view of [carjacks](https://donojazz.github.io/Crime/carjack_police_box.html) that ocurred within police box.
+- This is a view of [carjacks](https://donojazz.github.io/Crime/carjacks_police_box.html) that ocurred within police box.
 
 
 ### Homicide Files
