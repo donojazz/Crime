@@ -11,7 +11,7 @@
 
 - This is a view of [homicide](https://donojazz.github.io/html_store/homicide_map.html) mappings.                
 
-- This is a view of [homicide](https://donojazz.github.io/html_store/homicides_police_box.html) that ocurred within police box.
+- This is a view of [homicides](https://donojazz.github.io/html_store/homicides_police_box.html) that ocurred within police box.
 
                     
 
