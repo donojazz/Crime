@@ -8,9 +8,9 @@
 
 - This is a clustered view of [carjack](https://donojazz.github.io/Crime/cluster_carjack.html) data.
 
-- This is a view of [carjacks](https://donojazz.github.io/crime/Carjack_map.html) that occurred within STL  Neighborhoods.                
+- This is a view of [carjacks](https://donojazz.github.io/Crime/carjack_map.html) that occurred within STL  Neighborhoods.                
 
-- This is a view of [carjacks](https://donojazz.github.io/crime/Carjack_police_box.html) that ocurred within police box.
+- This is a view of [carjacks](https://donojazz.github.io/Crime/carjack_police_box.html) that ocurred within police box.
 
 
 ### Homicide Files
