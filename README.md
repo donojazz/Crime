@@ -1,4 +1,4 @@
-# This is a website to collect crime details files
+# This is a website to collect crime detail files
 Analysis of Crime in St Louis
 
 
