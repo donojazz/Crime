@@ -4,7 +4,7 @@
 
 ### Carjack Files
 
-- Complete hijack [analysis](https://donojazz.github.io/Crime/carjacks-jan2020.html)
+- Complete carjack [analysis](https://donojazz.github.io/Crime/carjacks-jan2020.html)
 
 - This is a clustered view of [carjack](https://donojazz.github.io/Crime/cluster_carjack.html) data.
 
