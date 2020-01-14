@@ -16,7 +16,7 @@ background-image: url(images/police.jpg)
 background-size: cover
 # St Louis Crime
 &lt;img src=""/&gt;
-## Carjacks and Homicides
+## Carjacks and Homicides in the Gateway City
 .large[Jim Donovan | Stl DS &amp; AI Meetup | 14 Jan 2020]  
 &lt;br&gt;
 github: https//:donojazz.github.io/Crime
@@ -102,32 +102,9 @@ class: inverse, center, top
 # My Background 
 
 ---
-class: inverse
-.center[![Military Experience](images/c141toff1.jpg)]
-#  .center[ Military Experience  ]
-
- USAF Flyer - Navigator - C141  
-
- Airlift Planner for Airlift Movement   
-.right[![Military Experience](images/z-1001.jpg)]
-
----
-class: inverse
-.center[![SWIC Adjunct Faculty](images/SWIC_logo_long.jpg)]
-#  .center[ SWIC Adjunct Faculty ]
-
- Introduction to Business Computing  
-
--   Hardware, Software, Databases, Architecture, Networks, Internet, Security Issues
- 
-- Semester Projects with **Excel and MS Access**
- 
-
- .center[![SWIC Adjunct Faculty](images/feynman-teach1.jpg)]
----
 class:inverse
 &lt;img src="images/mitreImage.jpg" width ="700", height = "200"&gt;
-#  .center[ MITRE Corporation ]
+#  .center[ MITRE Corporation (FFRDC) ]
 
 - Network and Systems Engineer
 
@@ -151,9 +128,9 @@ class: inverse
 --
 &lt;br&gt;
 
-**Tidyverse  **
+**Tidyverse +  **
 
--  Data.table, DPLYR, STRINGR, LUBRIDATE, GGPLOT2, 
+-  Data.table, DPLYR, STRINGR, FORCATS, LUBRIDATE, GGPLOT2 
 
 --
 &lt;br&gt;
@@ -167,7 +144,7 @@ class: inverse
 
 **Github  **
 
--  Github Pages, Website 
+-  Github Pages, Website, Jekyll 
 
 --
 &lt;br&gt;
@@ -190,19 +167,22 @@ class: inverse, center, middle
 
 ---
 class: inverse
-#  What I Learned About Police Data
+#  .center[What I Learned About Police Data]
 
 --
+
 Data is inconsistent and needs a lot of work to "TIDY" 
 
-- Plots and addresses missing
+- Plots and addresses missing  
 
 --
-Duplicate crime identifiers for same crime type
-  
-  -  Claim that records keys unique, but not really 
+
+Duplicate crime identifiers for same crime type  
+
+-  STMP Claims that records keys are unique - not really  
 
 --
+
 Multiple data sets offered  
 
 - Police Reports Division offers data (PDF)  
@@ -210,32 +190,52 @@ Multiple data sets offered
 - Police Crime Analysis offers (PDF or CSV)  
 
 --
-Uniform Crime Reporting (UCR) inconsistent across cities
+
+Uniform Crime Reporting (UCR) System very inconsistent across cities  
 
 --
-Arbitrary descriptions of crimes (free text descriptions)
+
+Arbitrary descriptions of crimes (free **text** descriptions)  
 
 ---
 class: inverse 
-# Investigated Carjacking First Then Homicides 
+# .center[Started with Carjacking Then Moved to Homicides ]  
 
-Downloaded monthly data sets for 2 years
+--
 
-Structured data 
- 
-Discovered "Hot Spots" with heatmaps and histograms
+Started downloading data in October 2018  
 
--  Significant diferences between "Crime Box" and crime locations
+-  Eventually collected data for 2 years  
 
-70% of homicides occurred in 23% of neighborhoods
+--
 
+Started with carjacks due to the **Channel 5** news story
 
+-  Moved on to homicides - a small change in data with same analysis structure (crime code  - 38111 to 10000)  
+
+-  Potential to create **Shiny** App for other crime codes  
+
+--
+
+Discovered "Hot Spots" with heatmaps, custers, and histograms  
+
+-  Found significant diferences between "Crime Box" and crime locations  
+
+--
+
+Discovered that 70% of homicides occurred in 22 of the neighborhoods  
+
+--
+
+Noticed that Hayden Rectangle missed a lot of the crime **"hot spots"**.
+
+- Just like **St Louis Dispatch** (Janelle O'Dea) stated last Sunday  
 
 ---
 
 class:inverse, center, middle
 # .center[**Go to Analyses**]
-.center[![](images/cluster_homicides1.png)]
+.center[![](images/cluster_carjack1.png)]
     </textarea>
 <style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
 <script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
