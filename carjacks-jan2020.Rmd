@@ -1,0 +1,783 @@
+---
+title: "STL Carjacks"
+author: "Jim Donovan"
+date: "Jan 14, 2020"
+output:
+  revealjs::revealjs_presentation:
+    theme: serif
+    highlight: default
+    transition: fade
+    incremental: false
+    reveal_options:
+      slideNumber: true    
+---
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE, 
+                      eval = TRUE, 
+                      message = FALSE,
+                      warning = FALSE, 
+                      fig.width = 12, 
+                      fig.height = 8,
+                      fig.retina = 1,
+                      tidy = TRUE)
+```
+
+
+```{r echo=FALSE}
+# install all the library packages
+library(rgdal)
+library(sp)
+library(sf)
+library(raster)
+library(leaflet)
+library(leafpop)
+library(mapview)
+library(tidyverse)
+library(censusxy)
+library(tidycensus)
+library(ggplot2)
+library(ggmap)
+library(plotly)
+library(RColorBrewer)
+library(data.table)
+library(fasttime)
+library(sparklyr)
+library(lubridate)
+library(maps)
+library(stringr)
+library(readr)
+```
+
+## Collected Crime Data from the STL Metropolitan Police Website {data-background=#F5FAFF}
+
+- The STL Metropolitan Police produces a monthly crime update.  
+
+- Stored in a csv format and can be downloaded.  
+
+- Located at <https://www.slmpd.org/Crimereports.shtml>.  
+
+- The file provides all crime details collected from the preceding month.  
+
+- Contains locations, neighborhoods, precincts, map coordinates and times of crimes in the St Louis Metropolitan Area.  
+
+    
+##  Download data {data-background=#F5FAFF}
+
+```{r}
+# Collect St Louis City crime UCR statistics
+# pull in state coordinate system files from st louis police reports using data.table
+crime <- fread("Group2018.csv", stringsAsFactors=FALSE)
+head(crime)
+```
+
+## Review Data Values {data-background=#F5FAFF}
+
+- Some fields are irrelevant to our analysis. 
+
++ Flags **NOT** needed  
+
++ Count **NOT** useful  
+
+- We will remove these elements using a tidyverse library called dplyr.  
+
+- We will also have to restructure date/time variables.  
+
+
+
+```{r, echo=FALSE, results='hide'}
+## Summary Data {data-background=#F5FAFF}
+summary(crime)
+```
+
+## Adjust Data Structures to Match those Needed for Analysis {data-background=#F5FAFF}
+
+- Wanted to select a specific crime. In this case we will look at St Louis Armed Carjackings.  
+
+- Some data fields are not relevant to the analysis so I've limited the data to the following 6 elements.  
+
+- Carjackings are UCR coded as **38111**.  
+
+- During this phase wanted to determine **data types**.  
+
+- The mix is a combination of characters string and integers.  
+
+- Re-charactize some elements to more easily manipulate later.  
+
+- "CodedMonth" and "DateOccur" are **NOT** date/time elements, so they need to be changed.  
+
+
+
+
+```{r, echo=FALSE, results='hide'}
+## Eliminate Unnecessary Variables {data-background=#F5FAFF}
+crimeA <- crime %>% select(-FlagCrime, -FlagUnfounded, -FlagAdministrative, -Count, -FlagCleanup) %>%
+            filter(Crime == 38111) %>%
+            distinct(Complaint, .keep_all = TRUE) # remove duplicate records
+  
+glimpse(crimeA)
+```
+
+## Prepare Data for Manipulating Date/time Fields {data-background=#F5FAFF}
+
+- Use **stringr** and **lubridate** libraries to change data types.  
+
+- Change **"CodedMonth"** to a string value closer to one resembling a year/month/day field.  
+
+- Used 28th as the **"end of month"** value so I do not have to constantly worry about the changing EOM value.  
+
+- Since the data is reported as monthly report, will not significantly affect the monthly crime perspective.  
+
+- Next I create a concatonated **string** group and convert that field into a **POSIX** day/month/day variable
+    
+
+
+```{r, echo=FALSE, results='hide'}
+## Change String Variables to Date/Time {data-background=#F5FAFF}
+
+#- This is R code for the adjustments  
+crimeA$CodedMonth <- str_c(crimeA$CodedMonth, "28", sep = "-") # use stringr to create add a day to the y/m structure
+crimeA$CodedMonth <- as_date(crimeA$CodedMonth) # use lubridate to convert to actual y/m/d
+crimeA$DateOccur <- mdy_hm(crimeA$DateOccur) # use lubridate to change string to date/time structure
+```
+
+
+```{r, echo=FALSE, results='hide'}
+## Result of Changing String Value {data-background=#F5FAFF}
+#- "CodedMonth" is now a date format and "DateOccur" is now a **POSIX** date time data type.  
+#- Check structures of the data.
+str(crimeA)
+```
+
+
+
+```{r, echo=FALSE}
+## Check Final Data Structure {data-background=#F5FAFF}
+
+#- Looks like coded_month and date_occur are OK.  
+summary(crimeA)
+```
+
+
+
+
+
+```{r, echo=FALSE}
+## Create and Calculate Reporting Delay Structure {data-background=#F5FAFF}
+
+crimeB <- crimeA %>% mutate(Reporting.diff = CodedMonth - as_date(DateOccur)) %>%
+  select(Reporting.diff:Complaint) %>%
+  arrange(desc(Reporting.diff))
+crimeB$Neighborhood <- as_factor(crimeB$Neighborhood) # change to factor for later join
+```
+
+## Reporting Delays {data-background=#F5FAFF}
+
+- An interesting side note are the differences between **reporting day** and **actual incident** date.  
+
+- Some of the records are reported significantly longer than 30 days.  
+
+```{r, echo=FALSE}
+crimeB
+```
+
+## Bring in the Neighborhood Details {data-background=#F5FAFF}
+
+- Imported **US Census** data to bring in **geospatial polygons** that represent St Louis Neighborhoods.  
+
+- Transform mapview data into WGS84 structure.  
+
+- Finally, make sure data is actually a geospatial object and can be used later for mapping purposes. 
+
+    
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+## Get Shape Files {data-background=#F5FAFF}
+#- Use census geospatial data to generate a map.
+## Now join neighborhoods with names
+#add neighborhood shapes to a data frame
+# From https://www.census.gov/geo/maps-data/data/cbf/cbf_state.html
+hoods.sf <- readOGR("St Louis Shape files/nbrhds_wards/BND_Nhd88_cw.shp")
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+## Create a **Simple Features (sf)** File of the Neighborhoods {data-background=#F5FAFF}
+hoods.sf <- spTransform(hoods.sf, CRS("+proj=longlat +datum=WGS84"))
+hoods <- mapview(hoods.sf, map.types = c("OpenStreetMap"),
+                 layer.name = c("Neighborhoods"),
+                 alpha.regions = 0.1,
+                 alpha = 2,
+                 zcol = c("NHD_NAME"))
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+## Convert Neighborhood Details {data-background=#F5FAFF}
+
+#- Change sf file into a data frame.
+# collect neighborhood details from shape file
+hoods.df <- as(hoods.sf, "data.frame")
+hoods.df %>% class() # check class
+```
+
+## Review Neighborhood Data {data-background=#F5FAFF}
+
+- We have 88 neighborhoods along with their name and numbers
+
+-  Note that **NHD_NUM** are typed as factors not integers. Will have to adjust that later. 
+
+- The polygon shape details are included in this data frame.  
+
+  
+```{r, echo=FALSE}
+glimpse(hoods.df)
+```
+
+
+    
+```{r, echo=FALSE}
+## Clean Up Data - Trim Neighborhoods and Prepare for Joins {data-background=#F5FAFF}
+#- Bring in the neighborhood name with their respective number codes.  
+#- Create a new data frame.
+crimeC <- hoods.df  %>% select(NHD_NUM, NHD_NAME)
+#crimeC$NHD_NUM <- as.integer(crimeC$NHD_NUM) # convert to integer
+# join carkacks table with hoods table to get neighborhood names
+crimeD <- left_join(crimeB, crimeC, by = c("Neighborhood" = "NHD_NUM")) 
+```
+
+```{r, echo=FALSE}
+## See the Final Data Frame {data-background=#F5FAFF}
+glimpse(crimeD)
+```
+
+## Group by Month and Count Number of Carjackings per month {data-background=#F5FAFF}
+
+- Group data by coded month.  
+
+- Count the number of carjackings per month.  
+
+- Display table.  
+
+    
+## Monthly Count {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+crimeA %>% 
+  group_by(CodedMonth) %>%
+  count(Crime) %>%
+  arrange(desc(n)) %>%
+  head(n=20)
+```
+
+## Totals by Month Using _ggplot2_ {data-background=#F5FAFF}
+
+- Data presented in a bar graph with totals displayed above the bar.  
+
+- I added a **LOESS (locally weighted smoothing) line** to get a better view of the crime movement.  
+
+- Note that November 2018 was the peak.  
+
+- Timeframe when Channel 5 reported abount the severe increase in carjackings.  
+
+- Also the same timeframe when they reported establishing a crime task force.  
+
+    
+```{r, echo=FALSE}
+## Monthly Plot {data-background=#F5FAFF}  
+#- Here is the code for the monthly plot.
+#- We are using **ggplot** as the tool.
+## Plot the count by month
+crime.month <- crimeA  %>% 
+  group_by(CodedMonth) %>%
+  count(Crime) %>%
+  arrange(desc(n)) 
+  
+xx = ggplot(crime.month, aes(x = CodedMonth, y = n)) +
+  geom_text(aes(label = n, y = n), size = 5, position = position_stack(vjust = 1.2)) +
+  geom_col(color = "cornflowerblue") +
+  geom_point() +
+  stat_smooth() +  # add a smoothing regerssion for time series
+  scale_x_date(date_breaks = "4 weeks", date_labels = "%m") +
+  theme(axis.text.x = element_text(angle = 90)) +  # change tex to verticle
+  labs(title = "Carjacks Per Month", x= "Month", y = "C
+       Carjack Count") 
+```
+
+## Carjacks by Month {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+xx
+```
+
+## Next, Look at Neighborhood by Name and Count Carjacks {data-background=#F5FAFF}
+
+- Had to convert the **factor** variable **(NHD_NAME)** and  account for missing instances **(NA)**.  
+
+- Group the neighborhoods and **count carjack instances**, then put in decending order.  
+
+- Next slide ranks carjacking numbers per neighborhood, high to low. 
+
+    
+## Neighborhood Numbers  {data-background=#F5FAFF} 
+
+```{r, echo=FALSE}
+## Group by Neighborhood and count
+crimeD  %>%
+  mutate_if(is.factor,
+                      fct_explicit_na,
+                      na_level = "to_impute") %>%
+  group_by(NHD_NAME) %>%
+  count(Crime, sort = TRUE) %>%
+  arrange(desc(n)) 
+```
+
+## Neighborhood Count by Month {data-background=#F5FAFF}
+
+- Group by Neighborhood Name. 
+
+- Count number of carjacks
+
+- Put grouped data in descending order   
+
+- Select only neighborhoods with carjacks greater than 5.
+
+- Plot results
+
+
+```{r, echo=FALSE}
+## Plot the count by month
+hood.number <- crimeD %>%
+  mutate_if(is.factor,
+                      fct_explicit_na,
+                      na_level = "to_impute") %>%
+  group_by(NHD_NAME) %>%
+  count(Crime) %>%
+  filter(n > 5) %>%
+  arrange(desc(n))
+```
+
+
+```{r, echo=FALSE}
+## Plot by Neighborhood {data-background=#F5FAFF}
+
+xy = ggplot(hood.number, aes(x = reorder(NHD_NAME, +n), y = n)) +
+  geom_bar(stat = "identity") +
+  geom_col(color = "cornflowerblue") +
+  coord_flip() +
+  theme(axis.text.x = element_text(angle = 90)) + # change tex to verticle
+  labs(title = "Carjacks by Neighborhood", x= "Neighborhood", y = "Carjack Count")
+```
+
+## Carjacks by Neighborhood {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+xy
+```
+
+## Time of Day Carjacks {data-background=#F5FAFF}
+
+- Looks like there is a significant difference in times that the crime occured.  
+
+- Seems to be more afternoon to midnight occurrances than post midnight to noon.  
+
+- May **need a further breakdown** of crime times to make this meaningful.  
+
+    
+```{r}
+## Plot the count by month
+crime.tod <- crimeD  %>%
+  select(Crime, CodedMonth, DateOccur) %>%
+  mutate(hour = hour(DateOccur)) %>%
+  mutate(am = am(DateOccur)) %>%  #  determine if the date occurred in the AM or PM
+  group_by(CodedMonth, am) %>%
+  count(Crime)
+```
+
+##  Time of Day Data {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+ggplot(crime.tod, aes(x = CodedMonth, y = n, fill = am)) +
+     scale_fill_discrete(name = "Timeframe", labels = c("PM", "AM")) +
+    geom_col(color = "cornflowerblue") +
+    scale_x_date(date_breaks = "5 weeks", date_labels = "%m") +
+    theme(axis.text.x = element_text(angle = 90)) +
+    labs(title = "Monthly Carjack Timeframe", x= "Am or PM", y = "Carjack Count") +
+    labs(fill = "Mornings")
+```
+
+
+
+
+```{r, echo=FALSE}
+## Let's Look at the Geospatial Aspects of the Carjack Analysis {data-background=#F5FAFF}
+
+#- We will use the data we restructed earlier in the analysis.  
+
+#- We will use the crime D file.  
+
+#- Check the structure of the file we selected.  
+
+## Summary of the Characteristics of the Crime Data {data-background=#F5FAFF}
+summary(crimeD) 
+```
+
+## Understand and Generate Geospatial Structures {data-background=#F5FAFF}
+
+- XCoord and YCoord coordinates are based on the **State Plane North American Datum 1983 (NAD83)** format.  
+
+- This data will have to be converted to lat/long values.  
+
+- Some of the XCoords and YCoords have values of O.  This will need to be accounted for later in the analysis.  
+
+    
+
+```{r, echo=FALSE, results='hide'}
+## Let's Review the Basic Data Structure {data-background=#F5FAFF}
+str(crimeD)
+```
+
+## Account For Inconsistent Coordinate Data {data-background=#F5FAFF}
+
+- Collect records whose **X/Y Coord** values are zeros.  
+
+- Subset the records that have "zero" values in XCoord, YCoord.  
+
+- These records will need a different type of processing.  
+
+    
+    
+```{r, echo=FALSE}
+crimeD.zeros <- crimeD %>% filter(XCoord < 1)
+```
+
+
+```{r, echo=FALSE, results='hide'}
+## Here are the Missing Coordinates {data-background=#F5FAFF}
+
+crimeD.zeros # there are 22 carjack records that cannot be processed directly
+```
+
+
+
+```{r, echo=FALSE, results='hide'}
+## Records That Can Be Directly Converted to Lat/Long {data-background=#F5FAFF}
+crimeD.complete <- crimeD %>% filter(XCoord > 1)
+```
+
+
+```{r, echo=FALSE, results='hide'}
+## Here are the Complete Records {data-background=#F5FAFF}
+
+#- They can be processed directly with R's geospatial tools.
+
+crimeD.complete
+```
+
+## Convert the NAD83 Coordinates to WGS84 Structure {data-background=#F5FAFF}
+
+- Function transforms all the State Plane Coordinate values into NAD84 lat/long coordinates.  
+
+- More modern mapping structure used for GPS Mapping.
+
+- Projections are critical
+
+    
+```{r, message=FALSE, results='hide'}
+nad83_coords <- data.frame(x=crimeD.complete$XCoord, y=crimeD.complete$YCoord) # My coordinates in NAD83
+nad83_coords <- nad83_coords *.3048  ## Feet to meters
+coordinates(nad83_coords) <- c('x', 'y')
+proj4string(nad83_coords)=CRS("+init=epsg:2815")
+coordinates_deg <- spTransform(nad83_coords,CRS("+init=epsg:4326"))
+coordinates_deg
+#str(coordinates_deg)
+#class(coordinates_deg)
+# add converted lat-lonf and convert to numeric values
+crimeD.complete$lon <- as.numeric(coordinates_deg$x)
+crimeD.complete$lat <- as.numeric(coordinates_deg$y)
+#class(crimeD.complete)
+```
+
+
+
+```{r, echo=FALSE}
+##  Review Characteristics of Downloaded Crime Data {data-background=#F5FAFF}
+glimpse(crimeD.complete)
+```
+
+## Processing the Incomplete Data with Missing Coordinates {data-background=#F5FAFF}
+
+- Used **_censusxy_** library to pull latitude/longitude.  
+
+- The geocode function from the library requires a **street address and number, city, and zip code** (if available).  
+
+- It goes to the **US Census Bureau** to look up the address reported on police record and returns a lat/long.  
+
+- It creates an _sf_ file and allows plotting of locations on a map.  
+
+- Can only convert 22 instances with _censusxy_ since some addresses locations are missing.  
+
+
+## Generate Map {data-background=#F5FAFF}
+
+-  Here is the **censusxy** code to generate the map
+
+```{r}
+data <- mutate(crimeD.zeros, address.comb = paste(CADAddress, CADStreet, sep = " "), 
+               city = "St Louis", state = "MO")
+crimeD_sf <- cxy_geocode(data, address = address.comb, city = city, 
+                state = state,  style = "minimal", output = "sf")
+STL_Carjacks.small <- mapview(crimeD_sf,
+                 map.types = c("OpenStreetMap"),
+                 legend = FALSE,
+                 popup = popupTable(data, zcol = c("Complaint",
+                                                         "CodedMonth",
+                                                         "NHD_NAME",
+                                                         "District",
+                                                         "Crime",
+                                                         "Description")))
+```
+    
+    
+## Locations Obtained From US Census With Addresses Only {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+STL_Carjacks.small
+
+```
+
+
+
+```{r, echo=FALSE, results='hide'}
+## Larger Grouping that Contained Coordinates {data-background=#F5FAFF}
+
+#- These records contain the X/Y plotted locations.     
+## create an sf file that will map coordinates
+data.one <- mutate(crimeD.complete, address.comb = paste(CADAddress, CADStreet, sep = " "), city = "St Louis", state = "MO")
+crimeD_one.sf <- st_as_sf(data.one, coords = c("lon", "lat"), crs = 4326, agr = "constant")
+STL_Carjacks <- mapview(crimeD_one.sf, map.types = c("OpenStreetMap"),
+                        legend = FALSE,
+                        popup = popupTable(data.one, zcol = c("Complaint",
+                                                                   "CodedMonth",
+                                                                   "NHD_NAME",
+                                                                   "District",
+                                                                   "Crime",
+                                                                   "Description")))
+
+STL_Carjacks
+```
+
+## View Entire Geospatial Picture as Dynamic Map {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+total_carjacks <- STL_Carjacks + STL_Carjacks.small
+total_carjacks
+```
+
+## Now Let's Add-in the Neighborhoods {data-background=#F5FAFF}
+
+- Add neighborhoods.  
+
+- Data from  <https://www.census.gov/geo/maps-data/data/cbf/cbf_state.html>
+    
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+hoods.sf <- readOGR("St Louis Shape files/nbrhds_wards/BND_Nhd88_cw.shp")
+hoods.sf <- spTransform(hoods.sf, CRS("+proj=longlat +datum=WGS84"))
+hoods <- mapview(hoods.sf, map.types = c("OpenStreetMap"),
+                 layer.name = c("Neighborhoods"),
+                 legend = FALSE,
+                 alpha.regions = 0.1,
+                 alpha = 3,
+                 zcol = c("NHD_NAME"))             
+# collect neighborhood details from shape file
+# hoods.df <- as(hoods.sf, "data.frame")
+# hoods.df
+```
+
+## Hoods {data-background=#F5FAFF}
+
+```{r, echo=FALSE}
+hoods
+```
+
+## Final Map of everything {data-background=#F5FAFF}
+
+- Combine all the maps.
+    
+```{r, echo=FALSE}
+total_carjacks <- STL_Carjacks + STL_Carjacks.small + hoods
+total_carjacks
+
+```
+
+## Now We Look at Some Plots Targeting the Intensity of the Crime Area {data-background=#F5FAFF}
+
+- We select the **ggplot2** tool  
+
+- Input the file containing ALL the carjack locations
+
+- This give us a plot of all the the carjack locations. 
+
+- We are now ready to create our density, heat and contour maps.
+
+## Carjacks  {data-background=#F5FAFF}
+    
+```{r, echo=FALSE}
+##  reduce crime to violent crimes in downtown 
+violent_crimes <- crimeD.complete %>% 
+  filter(
+    Crime == 38111, 
+    -90.3238 <= lon & lon <= -90.1794334,
+    38.0 <= lat & lat <=  39.0 ) 
+# use qmplot to make a scatterplot on a map
+qmplot(lon, lat, data = violent_crimes, maptype = "toner-lite", color = I("red"), zoom = 12)
+```
+
+##  Modify Plots Into Different Views to Display the Data  {data-background=#F5FAFF}
+
+- First we create a  **density map** which shows contoured peaks as highest crime numbers for an area.  
+
+- Next we create **heat map** which uses darkers colors to illustrat higher crime numbers.  
+
+- Finally, we create at a **cluster map** which groups markers that crime counts in an area. 
+
+
+##  Density Plot  {data-background=#F5FAFF}
+    
+```{r, echo=FALSE}
+##  Density contour plots
+qmplot(lon, lat, data = violent_crimes, maptype = "toner-lite", geom = "density2d", color = I("red"), zoom = 12)
+```
+  
+## Finally, we create a heat map  {data-background=#F5FAFF}
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+##  This provides a good look at the density of csrjacks in the city
+qmplot(lon, lat, data = violent_crimes, geom = "blank", 
+       zoom = 14, maptype = "toner-background", legend = FALSE) +
+  stat_density_2d(aes(fill = ..level..), geom = "polygon", alpha = .35, colour = NA) +
+  scale_fill_gradient2("Carjacks\nHeatmap", low = "white", mid = "yellow", high = "red", midpoint = 20)
+```
+## Another View of Crime Area Numbers {data-background=#F5FAFF}
+
+- We can use another tool to depict crime cluster locations - **LEAFLET**
+
+- It uses clusters to illustrate numbers in an area.  
+
+- Count instances and allows us to drill down.
+
+```{r}
+zz <- leaflet(data=crimeD.complete) %>% 
+  addTiles() %>%
+  setView(-90.222, 38.608, zoom = 13) %>%
+  addProviderTiles(providers$CartoDB.Positron) %>%
+  addCircleMarkers(lng = ~lon, 
+                   lat = ~lat, 
+                   fillColor = blues9,
+                   stroke = FALSE, fillOpacity = 0.8,
+                   clusterOptions = markerClusterOptions(),
+                   popup = ~DateOccur) %>%
+  addPolygons(data= hoods.sf, label = ~NHD_NAME,
+              color = "#444444",
+              weight = 1,
+              smoothFactor = 0.5,
+              opacity = 1.0,
+              fillOpacity = 0.005,
+              highlightOptions = highlightOptions(color = "white",
+                                                  weight = 2,
+                                                  bringToFront = TRUE))
+```
+##  Carjackings 
+
+```{r, echo=FALSE}
+zz
+```
+
+## Remember my Earlier Comments About Chief Hayden's Crime Box?  {data-background=#F5FAFF}
+
+- This is how it plots out against carjacks.  
+
+- And the mayor said she would give him an **A**?  
+
+
+```{r, echo=FALSE}
+## Hayden Rectangle Plot  {data-background=#F5FAFF}
+## Created csv that defines the crime box focus area
+police_crime_focus <- fread("police_crime_focus.csv", stringsAsFactors=FALSE)
+## Create a spatial file of the police crime focus
+#police_crime_focus
+police_point.sf <- st_as_sf(police_crime_focus,
+                            coords = c("lon", "lat"),
+                            crs = 4326, agr = "constant")
+##police points
+#police_point.sf
+## Create matrisx of lat/long
+df <- data.frame(police_crime_focus$lon, police_crime_focus$lat)
+# You need first to close your polygon 
+# (first and last points must be identical)
+df <- rbind(df, df[1,])
+## Create a pololygon of the area of the police box
+police.polygon <- st_sf(st_sfc(st_polygon(list(as.matrix(df)))), crs = 4326)
+#police.polygon
+police.box <- mapview(police.polygon, map.types = c("OpenStreetMap"),
+                layer.name = c("Police Box"),
+                legend = FALSE,
+                alpha.regions = 0.3,
+                alpha = 6,
+                label = NULL,
+                color = "red",
+                col.regions = "red")
+```
+    
+```{r, echo=FALSE, results='hide'}
+## Police Crime Box {data-background=#F5FAFF}
+
+#-  From intersection of Goodfellow and MLK.  
+
+#- North along Goodfellow to W. Florissant.  
+
+#- Then Southeast along W. Florissant to Prarie.  
+
+#- Then southwest along Prarie/Vandeventner to MLK.  
+
+#- Back to MLK and Goodfellow.  
+
+police.box 
+```
+
+## Not Sure That He Deserves an **"A"** {data-background=#F5FAFF}
+    
+```{r, echo=FALSE}
+ ## Add in Police Box               
+STLtotal_carjacks <- STL_Carjacks + STL_Carjacks.small + police.box + hoods
+  
+```
+
+```{r, echo=FALSE}
+## Combine Outputs {data-background=#F5FAFF}
+STLtotal_carjacks        
+
+```
+
+
+```{r}
+mapshot(total_carjacks, url = paste0(getwd(), "/carjack_map.html"),
+        file = paste0(getwd(), "/carjack_map.png"))
+```
+
+```{r}
+mapshot(STLtotal_carjacks , url = paste0(getwd(), "/carjacks_police_box.html"),
+        file = paste0(getwd(), "/carjacks_police_box.png"))
+```
+
+```{r}
+mapshot(zz , url = paste0(getwd(), "/cluster_carjack.html"),
+        file = paste0(getwd(), "/cluster_carjack.png"))
+```
+
+## Quick Review Homicide Analysis
+
+<br>
+<br>
+<br>
+<img src="images/Homicide+graphic+21.jpg" >
