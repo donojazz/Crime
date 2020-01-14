@@ -26,7 +26,7 @@
                     
 ### Presentation
 
--  [Presentation](https://donojazz.github.io/Crime/presentation-jan2020.html)for St Louis AI and Data Science Meetup
+-  [Presentation](https://donojazz.github.io/Crime/presentation-jan2020.html) for St Louis AI and Data Science Meetup
 
 
 
