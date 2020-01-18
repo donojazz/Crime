@@ -354,35 +354,48 @@ xy
 - Chart puts data in a descending order and presents greater than 5.  
 
 
+```{r, echo=FALSE, include=FALSE}
+### 12. Time of Day Carjacks 
 
-```{r}
-### Plot the count by month
-crime.tod <- crimeD  %>%
-  select(Crime, CodedMonth, DateOccur) %>%
-  mutate(hour = hour(DateOccur)) %>%
-  mutate(am = am(DateOccur)) %>%  #  determine if the date occurred in the AM or PM
-  group_by(CodedMonth, am) %>%
-  count(Crime)
+## create and mutate an hour of day field using lubridate
+hour.day <- as.integer(format(crimeA$DateOccur, "%H"))
+crimeA <- crimeA %>% as_tibble() %>%
+  mutate(hr.day = as.integer(format(crimeA$DateOccur, "%H"))) 
+
+
+## This adds a new field to crimeA data frame to categorize a day into 6 hour blocks
+## used a logic functons to segment day categories
+## adds field to crimeA
+crimeA$day.cat <- ifelse(crimeA$hr.day > 0 & crimeA$hr.day < 6, "night",
+                         ifelse(crimeA$hr.day >= 6 & crimeA$hr.day < 12, 'morning',
+                                ifelse(crimeA$hr.day > 12 & crimeA$hr.day <= 18, "afternoon",
+                                       ifelse(crimeA$hr.day > 18 & crimeA$hr.day < 24, "evening",
+                                              ifelse(crimeA$hr.day == 0, "night",
+                                                     ifelse(crimeA$hr.day == 12, "afternoon", NA ))))))
+## arrange as factors
+day.lvls <- c("morning", "afternoon", "evening", "night")
+crimeA$day.cat <- factor(crimeA$day.cat, levels = day.lvls)
 ```
 
 ### **12. Time of Day Carjacks**
 
-```{r include=TRUE}
-ggplot(crime.tod, aes(x = CodedMonth, y = n, fill = am)) +
-     scale_fill_discrete(name = "Timeframe", labels = c("PM", "AM")) +
-    geom_col(color = "cornflowerblue") +
-    scale_x_date(date_breaks = "5 weeks", date_labels = "%m") +
-    theme(axis.text.x = element_text(angle = 90)) +
-    labs(title = "Monthly Homicide Timeframe", x= "Am or PM", y = "Homicides Count") +
-    labs(fill = "Mornings")
+```{r, echo=FALSE, include=TRUE}
+ggplot(crimeA) +
+  geom_bar(aes(x = CodedMonth, fill = factor(day.cat)))+
+  scale_x_date(date_breaks = "28 days", date_labels = "%B") +
+  scale_fill_discrete(name = "Timeframe", labels = c("Morning", "Afternoon", "Evening", "Night")) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title = "Monthly Homicide Timeframe", x= "Time of Day", y = "Homicides Count") 
+ 
 ```
 ***
 
-- Looks like there is a significant difference in times that the crime occured.  
+- Create and mutate an hour of day field using lubridate.  
 
-- Seems to be more afternoon to midnight occurrances than post midnight to noon.  
+-  This adds a new field to crimeA data frame to categorize a day into 6 hour blocks.  
 
-- May need a further breakdown of crime times to make this meaningful.  
+- Used a logic functions to segment day categories
+
 
 ### 13.  Let's Look at the Geospatial Aspects of the Homicide Analysis 
 
