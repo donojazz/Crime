@@ -1,6 +1,9 @@
 
 ## Welcome to St Louis Crime Project
 
+### Here is the latest data on the STL Homicides 
+
+- Covers all of 2020 [Homicides](https://donojazz.github.io/Crime/homicide-jan2020_new.html)
 
 ### Carjack Files
 
