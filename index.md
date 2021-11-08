@@ -31,7 +31,7 @@
 
 -  [Presentation](https://donojazz.github.io/Crime/presentation-jan2020.html) for St Louis AI and Data Science Meetup
 
-https://donojazz.github.io/STRACNET-Analysis/US_Rail_Analysis.html
+
 
 
 
